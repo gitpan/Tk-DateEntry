@@ -14,11 +14,13 @@ package Tk::DateEntry;
 
 use vars qw($VERSION);
 
-$VERSION = '1.33';
+$VERSION = '1.34';
 
 use Tk;
 use strict;
 use Carp;
+use Time::Local;
+BEGIN { eval 'use POSIX qw(strftime)'; warn $@ if $@ }
 
 require Tk::Frame;
 
@@ -46,6 +48,7 @@ sub Populate {
 
     $tl->transient($w);
     $tl->overrideredirect(1);
+    $tl->OnDestroy(sub { $w->{_status} = 'done' }); # XXX really needed?
 
     $b->pack(-side => "right", -padx => 0);
     $e->pack(-side => "right", -fill => 'x', -expand => 1, -padx => 0);
@@ -55,7 +58,10 @@ sub Populate {
     $b->bind("<space>", [ $w => 'buttonDown' ]);
     $b->bind("<Key-Return>", [ $w => 'buttonDown' ]);
     $e->bind("<Key-Return>", [ $w => 'buttonDown' ]);
-    $w->bind("<FocusOut>", [ $w => 'popDown' ]);
+    $w->bind("<FocusOut>", sub { my $e = shift->XEvent;
+				 my $wout = sub { if (UNIVERSAL::isa($_[0],"Tk::Label")) { $_[0]->cget(-text) } else { $_[0] } };
+				 $w->popDown;
+			     });
 
     # Create the buttons on the dropdown.
     my $fr = $w->{_frame} = $tl->Frame->pack(-anchor=>'n');
@@ -270,9 +276,12 @@ sub buttonDown
 	#
 	my $cal = $w->getCalendar;
 
-	$w->{_monthlabel}->configure
-	    (-text=>strftime($w->cget('-headingfmt'),0,0,0,1,
-			     $w->{_month}-1,$w->{_year}-1900));
+	my $monthlabel = (defined &strftime
+			  ? strftime($w->cget('-headingfmt'),0,0,0,1,
+				     $w->{_month}-1,$w->{_year}-1900)
+			  : $w->{_month} . "/" . $w->{_year}
+			 );
+	$w->{_monthlabel}->configure(-text=>$monthlabel);
 
 	for my $week (0..5) {
 	    for my $wday (0..6) {
@@ -484,18 +493,17 @@ sub getCalendar
 {
     my ($w) = @_;
 
-    use Time::Local;
-    use POSIX(qw(strftime));
-
     my $week=0;
     my $cal=[];
 
     for my $mday (1..31) {
-	my ($m,$y,$wday) =
+	my ($m,$y,$wday) = eval {
 	    (localtime(timelocal(0,0,0,
 				 $mday,
 				 $w->{_month}-1,
-				 $w->{_year})))[4..6];
+				 $w->{_year})))[4..6]
+	};
+	last if $@;
 	$m++;
 
 	$wday = ($wday - $w->cget('-weekstart')) % 7;
@@ -519,8 +527,10 @@ sub popDown
     if ($w->{_popped}) {
 	$w->{_popped} = 0;
 	$w->grabRelease;
-	$w->{_oldgrab}->() if $w->{_oldgrab};
-	delete $w->{_oldgrab};
+	if ($w->{_oldgrab}) {
+	    $w->{_oldgrab}->();
+	    delete $w->{_oldgrab};
+	}
 	$w->{_toplevel}->withdraw;
 	$w->{_status} = 'done';
     }
@@ -700,6 +710,9 @@ Format for the Month name heading. The month name heading is created by
 calling strftime(format,0,0,0,1,month,year). Default format is '%B %Y'.
 Note that only month and year will have sensible values, including
 day and/or time in the heading is possible, but it makes no sense.
+
+If POSIX.pm is not available then this option has no effect and the
+month name heading format will just be "%m/%Y".
 
 =item -state => string
 
