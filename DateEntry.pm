@@ -14,7 +14,7 @@ package Tk::DateEntry;
 
 use vars qw($VERSION);
 
-$VERSION = '1.36';
+$VERSION = '1.37';
 
 use Tk;
 use strict;
@@ -408,7 +408,7 @@ sub readContent
     #
     my ($year,$month,$day) = $w->Callback(-parsecmd => $e->get);
     foreach ($year,$month,$day) {
-	unless (m/^\d+$/) {
+	if (defined $_ && !/^\d+$/) {
 	    undef $_;
 	}
     }
