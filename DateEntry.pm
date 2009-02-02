@@ -1,26 +1,26 @@
 #
 # DateEntry lets the user select a date from a drop-down calendar.
 #
-# Author: Hans J. Helgesen, October 1999.
-#
-# Maintainer is now Slaven Rezic <slaven@rezic.de>
-#
-# To contact the original author:
-# <hans.helgesen@novit.no>
-#
 # See end of this file for documentation.
 #
 package Tk::DateEntry;
 
 use vars qw($VERSION);
 
-$VERSION = '1.38';
+$VERSION = '1.38_90';
 
 use Tk;
 use strict;
 use Carp;
 use Time::Local;
 BEGIN { eval 'use POSIX qw(strftime)'; warn $@ if $@ }
+
+my $can_use_dcalc = 0;
+if (     eval q{ use Date::Calc qw(Day_of_Week check_date); 1 }) {
+    $can_use_dcalc = 1;
+} elsif (eval q{ use Date::Pcalc qw(Day_of_Week check_date); 1 }) {
+    $can_use_dcalc = 1;
+}
 
 require Tk::Frame;
 
@@ -521,6 +521,10 @@ sub getCalendar
 {
     my ($w) = @_;
 
+    if ($can_use_dcalc) {
+	return $w->getCalendarDC();
+    }
+
     my $week=0;
     my $cal=[];
 
@@ -544,6 +548,28 @@ sub getCalendar
 	}
     }
 
+    return $cal;
+}
+
+#--------------------
+# The same as getCalendar with Date::Calc
+#
+sub getCalendarDC
+{
+    my ($w) = @_;
+
+    my $week=0;
+    my $cal=[];
+    for my $mday (1..31) {
+	if (check_date($w->{_year},$w->{_month},$mday)) {
+	    my $wday = Day_of_Week($w->{_year},$w->{_month},$mday);
+	    $wday = ($wday - $w->cget('-weekstart')) % 7;
+	    $cal->[$week]->[$wday]=$mday;
+	    if ($wday == 6) {
+		$week++;
+	    }
+	}
+    }
     return $cal;
 }
 
@@ -627,57 +653,77 @@ sub prevMonth
 # increment or decrement the entry's day
 sub rotateDay
 {
-  my ( $w, $dir, $step ) = @_;
+    my ( $w, $dir, $step ) = @_;
 
-  $w->readContent;
-  $w->{_day} += $dir * $step;
-  # depend upon timelocal() to fix up days outside of 1..31
-  $w->updateDate;
+    $w->readContent;
+    $w->{_day} += $dir * $step;
+    # depend upon timelocal() to fix up days outside of 1..31
+    $w->updateDate;
 }
 
 sub rotateMonth
 {
-  my ( $w, $dir ) = @_;
+    my ( $w, $dir ) = @_;
 
-  $w->readContent;
+    $w->readContent;
 
-  $dir > 0 ? $w->nextMonth : $w->prevMonth;
+    $dir > 0 ? $w->nextMonth : $w->prevMonth;
 
-  $w->updateDate;
+    $w->updateDate;
 }
 
 sub rotateYear
 {
-  my ( $w, $dir ) = @_;
+    my ( $w, $dir ) = @_;
 
-  $w->readContent;
+    $w->readContent;
 
-  $w->{_year} += $dir;
+    $w->{_year} += $dir;
 
-  $w->updateDate;
+    $w->updateDate;
 }
 
 # make the entry widget track the internal notion of the date
 sub updateDate
 {
-  my ($w) = @_;
+    my ($w) = @_;
 
-  my ($d,$m,$y) = eval {
-    local $SIG{__DIE__} = undef;
-    (localtime(timelocal(0,0,0,
-			 $w->{_day},
-			 $w->{_month}-1,
-			 $w->{_year})))[3,4,5];
-  };
-  unless ( $@ )
-  {
-    $m++;
-    $y += 1900;
-    my $e = $w->Subwidget("entry");
-    $e->delete('0','end');
-    $e->insert('end',
-	       $w->Callback(-formatcmd=>$y,$m, $d));
-  }
+    if ($can_use_dcalc) {
+	return $w->updateDateDC();
+    }
+
+    my ($d,$m,$y) = eval {
+	local $SIG{__DIE__} = undef;
+	(localtime(timelocal(0,0,0,
+			     $w->{_day},
+			     $w->{_month}-1,
+			     $w->{_year})))[3,4,5];
+    };
+    unless ( $@ )
+	{
+	    $m++;
+	    $y += 1900;
+	    my $e = $w->Subwidget("entry");
+	    $e->delete('0','end');
+	    $e->insert('end',
+		       $w->Callback(-formatcmd=>$y,$m, $d));
+	}
+}
+
+sub updateDateDC
+{
+    my ($w) = shift;
+
+    my ($d,$m,$y);
+    if (check_date($w->{_year},$w->{_month},$w->{_day})) {
+	$y = $w->{_year};
+	$m = $w->{_month};
+	$d = $w->{_day};
+	my $e = $w->Subwidget("entry");
+	$e->delete('0','end');
+	$e->insert('end',
+		   $w->Callback(-formatcmd=>$y,$m, $d));
+    }
 }
 
 1;
@@ -736,8 +782,9 @@ currently selected.
 
 =head1 REQUIREMENTS
 
-Tk::DateEntry requires Time::Local and POSIX (strftime)
-(and basic Perl/Tk of course....)
+Tk::DateEntry requires L<Time::Local> and L<POSIX> (strftime) (and
+basic Perl/Tk of course....). For using dates before 1970-01-01 either
+L<Date::Calc> or L<Date::Pcalc> is required.
 
 =head1 OPTIONS
 
@@ -823,8 +870,8 @@ the current day button. A sample callback:
 
 The callback is called after initial configuration of a day widget,
 that is, i.e. the label and the background color is already set. Note
-that day buttons XXX beibehalten XXX their configuration while
-switching between months.
+that day buttons keep their configuration while switching between
+months.
 
 =item -daynames => [qw/Sun Mon Tue Wed Thu Fri Sat/]
 
@@ -958,15 +1005,21 @@ two of the fields are present. A more sophisticated regex might be needed....
 
 =head1 CAVEATS
 
-Tk::DateEntry uses timelocal(), localtime() and strftime().
-These functions are based on the standard unix time representation, which
-is the number of seconds since 1/1/1970.
-
-This means that Tk::DateEntry doesn't support dates prior to 1970, and on
-a 32 bit computer it doesn't support dates after 12/31/2037.
+If neither L<Date::Calc> nor L<Date::Pcalc> are available, then
+Tk::DateEntry uses timelocal(), localtime() and strftime(). These
+functions are based on the standard unix time representation, which is
+the number of seconds since 1/1/1970. This means that in this case
+Tk::DateEntry doesn't support dates prior to 1970, and on a 32 bit
+computer it doesn't support dates after 12/31/2037.
 
 =head1 SEE ALSO
 
 L<Tk::Entry>, L<Tk::Button>.
+
+=head1 AUTHOR
+
+Hans J. Helgesen <hans.helgesen@novit.no>, October 1999.
+
+Current maintainer is Slaven Rezic <slaven@rezic.de>.
 
 =cut
