@@ -1,7 +1,7 @@
 #!/usr/bin/perl 
 # -*- perl -*-
 
-# $Id: test.pl,v 1.8 2005/12/21 22:54:21 eserte Exp $
+# $Id: dateentry.t,v 1.8 2005/12/21 22:54:21 eserte Exp eserte $
 
 use strict;
 
@@ -15,10 +15,17 @@ BEGIN {
     }
 }
 
+use Tk;
+
+my $mw = eval { MainWindow->new };
+if (!$mw) {
+    print "1..0 # skip: cannot create MainWindow: $@";
+    exit;
+}
+
 my $dc_tests = 3;
 plan tests => 2 + $dc_tests;
 
-use Tk;
 require_ok('Tk::DateEntry');
 
 if (!defined $ENV{BATCH}) { $ENV{BATCH} = 1 }
@@ -40,8 +47,6 @@ if ((defined $ENV{LC_ALL} && $ENV{LC_ALL} =~ /^de/) ||
 		   },
 		  );
 }
-
-my $mw = MainWindow->new;
 
 my $arrowdownwin = $mw->Photo(-data => <<'EOF');
 #define arrowdownwin2_width 9

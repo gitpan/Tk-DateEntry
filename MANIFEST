@@ -3,4 +3,6 @@ MANIFEST
 Makefile.PL
 README
 t/dateentry.t
+t/isodate.t
 Changes
+META.yml                                 Module meta-data (added by MakeMaker)
