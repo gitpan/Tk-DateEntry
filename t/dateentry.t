@@ -1,9 +1,9 @@
 #!/usr/bin/perl 
 # -*- perl -*-
 
-# $Id: dateentry.t,v 1.8 2005/12/21 22:54:21 eserte Exp eserte $
-
 use strict;
+use FindBin;
+use lib "$FindBin::RealBin";
 
 BEGIN {
     if (!eval q{
@@ -16,6 +16,7 @@ BEGIN {
 }
 
 use Tk;
+use TkTest qw(catch_grabs);
 
 my $mw = eval { MainWindow->new };
 if (!$mw) {
@@ -77,27 +78,37 @@ if ($ENV{BATCH}) {
     $mw->after(1200, sub {
 		   $de->{_daybutton}->[2]->[3]->invoke;
 	       });
-    $de->buttonDown;
-    $mw->update;
-    # This blocks until a date is clicked
-    ok(defined $date && $date =~ /\d/, "Got date");
+    my $no_grab_error = catch_grabs {
+	$de->buttonDown;
+	$mw->update;
+	# This blocks until a date is clicked
+	like($date, qr/\d/, "Got date <$date>");
+    } 1;
 
  SKIP: {
 	skip("No Date::(P)Calc available", $dc_tests) if !$can_date_calc;
+	skip("grab error encountered, will not continue with tests", $dc_tests) if !$no_grab_error;
+
 	my $old_date = $de->Callback('-formatcmd', 1900, 1, 1);
 	$date = $old_date;
 	$mw->after(200, sub {
 		       $de->{_backbutton}->invoke;
 		   });
 	$mw->after(700, sub {
-		       $de->{_daybutton}->[2]->[3]->invoke;
+		       if ($de->cget('-weekstart') == 1) {
+			   $de->{_daybutton}->[2]->[3]->invoke;
+		       } else {
+			   $de->{_daybutton}->[2]->[4]->invoke;
+		       }
 		   });
-	$de->buttonDown;
-	$mw->update;
-	my($y,$m,$d) = $de->Callback('-parsecmd', $date);
-	is($d, 14, "Expected day");
-	is($m, 12, "Expected month");
-	is($y, 1899, "Expected year");
+	catch_grabs {
+	    $de->buttonDown;
+	    $mw->update;
+	    my($y,$m,$d) = $de->Callback('-parsecmd', $date);
+	    is($d, 14, "Expected day");
+	    is($m, 12, "Expected month");
+	    is($y, 1899, "Expected year");
+	} 3;
     }
 
 } else {

@@ -1,19 +1,28 @@
 --- #YAML:1.0
 name:               Tk-DateEntry
-version:            1.38_91
+version:            1.38_92
 abstract:           ~
 author:  []
 license:            unknown
 distribution_type:  module
 configure_requires:
     ExtUtils::MakeMaker:  0
+build_requires:
+    ExtUtils::MakeMaker:  0
 requires:
     Tk:  400
+resources:
+    repository:  git://github.com/eserte/tk-dateentry.git
 no_index:
     directory:
         - t
         - inc
-generated_by:       ExtUtils::MakeMaker version 6.48
+generated_by:       ExtUtils::MakeMaker version 6.54
 meta-spec:
     url:      http://module-build.sourceforge.net/META-spec-v1.4.html
     version:  1.4
+recommends:
+    Date::Calc:      0
+    Encode:          0
+    I18N::Langinfo:  0
+    Tk::FireButton:  0
