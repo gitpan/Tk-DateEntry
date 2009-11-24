@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Tk-DateEntry
-version:            1.38_93
+version:            1.38_94
 abstract:           ~
 author:  []
 license:            unknown
@@ -25,4 +25,5 @@ recommends:
     Date::Calc:      0
     Encode:          0
     I18N::Langinfo:  0
+    Text::Bidi:      0
     Tk::FireButton:  0
