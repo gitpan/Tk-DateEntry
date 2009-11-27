@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Tk-DateEntry
-version:            1.38_94
+version:            1.39
 abstract:           ~
 author:  []
 license:            unknown
