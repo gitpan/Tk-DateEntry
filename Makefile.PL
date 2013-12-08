@@ -3,12 +3,26 @@
 use 5.005; # new "for" syntax
 
 if (!eval q{ use Date::Calc; 1 } && !eval q{ use Date::Pcalc; 1 }) {
+    # It's possible to install Date::Calc without the XS parts, so
+    # there's no need to advertize Date::Pcalc anymore.
     print <<EOF;
 
 *** To select dates before 1970-01-01 and after year 2036, you need to
-    install either Date::Calc or Date::Pcalc.
+    install Date::Calc.
 
 EOF
+}
+
+my $eumm_recent_enough = $ExtUtils::MakeMaker::VERSION >= 6.54;
+
+if (!$eumm_recent_enough) {
+    *MY::dist_core = sub {
+	<<'EOF';
+dist :
+	$(NOECHO) $(ECHO) "Sorry, use a newer EUMM!"
+
+EOF
+    };
 }
 
 use ExtUtils::MakeMaker;
@@ -20,7 +34,7 @@ WriteMakefile(
     'PREREQ_PM' => {Tk => 400},
     'dist'      => {'COMPRESS'=>'gzip -9f', 'SUFFIX' => '.gz',
                     'POSTOP'=>'-$(CHMOD) 644 $(DISTVNAME).tar$(SUFFIX)'},
-    ($ExtUtils::MakeMaker::VERSION >= 6.54 ?
+    ($eumm_recent_enough ?
       (META_ADD => { resources => { repository => 'git://github.com/eserte/tk-dateentry.git' },
 		     recommends => {'Date::Calc'     => 0,
 				    'Encode'	     => 0,
@@ -43,8 +57,10 @@ EOF
     if (defined $ENV{USER} && $ENV{USER} eq 'eserte' && $^O =~ /bsd/i && -f "../../perl.release.mk") {
 	$postamble .= <<'EOF';
 
+PERL_TEST_DISTRIBUTION_OPTS=not podcover
+
 .include "../../perl.release.mk"
-.include "../../perl.cvs.mk"
+.include "../../perl.git.mk"
 
 EOF
     }
